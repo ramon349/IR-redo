@@ -123,8 +123,10 @@ def list_train_loop(device,learn_rate,epochs,data,model,opti,checkpointName):
         if (epoch+1) % 3 == 0:
             learn_rate /= 1.5
             update_lr(opti,learn_rate)
-        torch.save(MODEL.state_dict(), 'MRS_'+checkpointName+str(epoch)+'.ckpt')
-        np.save('loss_file',BIG_L)
+        check_file_name = './embeddings/MRS_'+checkpointName+str(epoch)+'.ckpt'
+        torch.save(MODEL.state_dict(), check_file_name)
+        loss_file_name='./losses/'+checkpointName+str(epoch)+".npy" 
+        np.save(loss_file_name,BIG_L)
 
 if __name__=="__main__":
     (data_path,loss_name,embdDim,checkpointName,prevState) = parse_inputs() 
@@ -135,14 +137,19 @@ if __name__=="__main__":
     # Device configuration
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('loading_data...')
-    # create data loader
-    med = True 
-    if med :
-        TINY = med_factory(mode="train",sampling=loss_name,data_path=data_path)
-    else: 
+    dataset = data_path.split('/')[-2]
+    TINY=None 
+    #consult sampling.py and med_sampling for factory methods 
+    if dataset=="tiny-imagenet-200":
+        print("Working on tiny data")
         TINY = tiny_factory(mode="train",sampling=loss_name,data_path=data_path)
-    DATALOADER = DataLoader(TINY, batch_size=16,shuffle=True)
-    #  Create model params 
+    if dataset=="dataset2":
+        print("working on path image data")
+        TINY = med_factory(mode="train",sampling=loss_name,data_path=data_path)
+    if TINY:
+        DATALOADER = DataLoader(TINY, batch_size=16,shuffle=True)
+    else:
+        raise ValueError("DATASET NAMES ARE INCORRECT" + dataset)
     NUM_EPOCHS = 20
     LEARNING_RATE = 0.0001 
     MODEL = build_model(DEVICE,embd_size=embdDim,MODEL_PATH=prevState) 
