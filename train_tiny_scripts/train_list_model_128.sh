@@ -10,4 +10,5 @@ loss="list"
 embdDim="128"
 checkPoint="tiny_${loss}_${embdDim}"
 prevState=""
-scl enable rh-python36 "python3 general_model.py ${data} ${loss} ${embdDim} ${checkPoint}${prevState}"
+cd ../
+scl enable rh-python36 "python3 ./src/general_model.py ${data} ${loss} ${embdDim} ${checkPoint}${prevState}"
