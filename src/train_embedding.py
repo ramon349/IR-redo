@@ -11,7 +11,10 @@ from skimage import io, transform
 import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
-
+import pdb 
+import sys 
+import numpy as np 
+from data_utils import * 
 
 def pil_loader(path):
     with open(path, 'rb') as f:
@@ -55,7 +58,6 @@ class Tiny(Dataset):
             self.image_dict[j] = np.array(os.listdir(os.path.join(self.root_dir,j,'images')))
             for k,l in enumerate(os.listdir(os.path.join(self.root_dir,j,'images'))):
                 L.append((l,i))
-                                                                                                                                                                   1,1           Top
         for i,j in enumerate(L):
             self.big_dict[i] = j
 
@@ -77,46 +79,41 @@ class Tiny(Dataset):
             temp = self.transform(temp)
         return temp, im_class
 
+if __name__ == "__main__":
+    model_path = sys.argv[1] 
+    embd_name = sys.argv[2]
+    process = sys.argv[3]
+    # Device configuration
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # create data loader
+    if process=="tiny":
+        other_name = "tiny"
+        print("hi")
+        Tiny = Tiny('/home/rlcorre/IR-final-project/deep-ranking-master/tiny-imagenet-200/train/')
+    else:  
+        other_name= "med" 
+        Tiny=one_LTiny("/labs/sharmalab/cbir/dataset2/train/")
+        print("med")
+    dataloader = DataLoader(Tiny, batch_size=100)
+    #create the model
+    model  = models.resnet50(pretrained=True)
+    num_features = model.fc.in_features
+    model.fc = nn.Linear(num_features,124)
+    model = model.to(device)
 
-print('libraries imoprted')
-# Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-print('loading training data...')
-# create data loader
-Tiny = Tiny('tiny-imagenet-200/val')
-dataloader = DataLoader(Tiny, batch_size=100)
-
-#create the model
-model  = models.resnet50(pretrained=True)
-num_features = model.fc.in_features
-model.fc = nn.Linear(num_features,2000)
-model = model.to(device)
-model_path = None # if you have pretrained weights, update the model path
-
-try :
     model.load_state_dict(torch.load(model_path))
-except :
-    pass
-def forward(x):
-    x = x.type('torch.FloatTensor').to(device)
-    return(model(x))
+    def forward(x):
+        x = x.type('torch.FloatTensor').to(device)
+        return(model(x))
+    embd_list = list()
+    model.eval()
+    with torch.no_grad():
+        L = []
+        for k,(i,j) in enumerate(dataloader):
+            print(k,end='\r')
+            temp = forward(i)
+            embd_list.append(temp.cpu().numpy())
+            L = L+list(j.numpy())
 
-embedding = torch.randn(10,2000).type('torch.FloatTensor').to(device)
-model.eval()
-with torch.no_grad():
-    L = []
-    for k,(i,j) in enumerate(dataloader):
-                                                                                                                                                                   48,1          81%
-        print(k,end='\r')
-        temp = forward(i)
-        embedding = torch.cat((embedding, temp), 0)
-        L = L+list(j.numpy())
-
-np.save('backup',embedding)
-np.save('backup2',L)
-eb = embedding.cpu().numpy()
-eb = eb[10:,:]
-np.save('embedding',eb)
-np.save('class_labels',L)
-                                                                                                                                                                   113,1         Bot
+    embd = np.vstack(embd_list)
+    np.save(embd_name,embd)

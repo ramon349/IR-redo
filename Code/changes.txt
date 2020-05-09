@@ -1,6 +1,0 @@
-Thread of changes needed to run 
-
-1. Modified code in data_utils line 38. This accounts for the fact OSX has a ds_store file 
- ( line 38 ) 
- 2. In data_utils removed return of  none tripled line 74 
- 
