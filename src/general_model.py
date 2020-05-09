@@ -12,8 +12,11 @@ import pdb
 import sys 
 
 def build_model(DEVICE,embd_size=124,MODEL_PATH=None):
-    #create the model
-    MODEL  = models.resnet50(pretrained=True)
+    """ Script to build the standard backboen of our project. 
+        main point of variance in our project is embedding size and 
+        loss fuction used. For consistency all models are built from the same funciton 
+    """ 
+    MODEL  = models.resnet101(pretrained=True)
     num_features = MODEL.fc.in_features
     MODEL.fc = nn.Linear(num_features,embd_size) 
     MODEL = MODEL.to(DEVICE)
@@ -22,6 +25,14 @@ def build_model(DEVICE,embd_size=124,MODEL_PATH=None):
     return MODEL
 
 def parse_inputs():
+    """ Model training is detrmined by imputs provided  by a bash script 
+    data_path: is the path to the data
+    loss_name: loss function to be used either triplet or list loss are expected 
+    embedDim: is the embedding dimensionality 
+    checkPointName: This is the base name for our embedding name. Should be 
+    descriptive 
+    prevState: should be path to a checkpoint if we intend to restart learning 
+    """
     data_path=sys.argv[1]
     loss_name=sys.argv[2]
     embdDim = int(sys.argv[3])
@@ -32,10 +43,19 @@ def parse_inputs():
         prevState=None    
     return (data_path,loss_name,embdDim,checkpointName,prevState)
 def update_lr(optimizer,lr):
+    """ Helper function to help update learning rate.
+    It's possible our loss may get stuck at some point. we'll decrease 
+    learning rate to be more fine grained over time 
+
+    """
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr 
 
 def triplet_train_loop(device,epochs,data,model,opti,checkpointName):  
+    """This is the training loop for the triplet loss function. 
+    sampling of data is unique. 
+    """ 
+
     triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2)
     LOSS_TR = []
     BIG_L = []
@@ -67,37 +87,25 @@ def triplet_train_loop(device,epochs,data,model,opti,checkpointName):
             update_lr(OPTIMIZER, CURR_LR)
         torch.save(MODEL.state_dict(),checkpointName+"_"+str(epoch)+'.ckpt')
     np.save('loss_file',BIG_L)
-def generate_sim(x,y):  
-    # 128 X 127 
-    simi_mat= torch.matmul(x,x.T)  #Cosine similarity calculaiton . i,j 
-    my_list = list()
-    num_samples = x.shape[0]
-    r = torch.arange(num_samples)
-    for i,e in enumerate(simi_mat):
-        my_list.append(e[r != i]) 
-    simi_mat  = torch.stack(my_list)
-    my_list = list()
-    for i,e in enumerate(y):
-        temp = e ==y
-        my_list.append(temp[ r != i])
-    rel_mat = torch.stack(my_list)
-    return simi_mat,rel_mat
 
 def list_train_loop(device,learn_rate,epochs,data,model,opti,checkpointName):
     my_loss = TAPLoss()
     BIG_L = []
     LOSS_TR=[]
     for epoch in range(epochs):
-        for i, (s1,s2,imclass) in enumerate(data): # changed D,L,IDX to just be D 
+        for i, (s1,s2,imclass) in enumerate(data): # see samplign code for s1,s2
             print(i,end='\r')
+            # stack samples vertically onto a single batch 
             P = torch.cat((s1,s2),0)
             P = P.to(device)
             imclass = torch.cat((imclass,imclass),0)
             opti.zero_grad()
             #forward pass
             P = MODEL(P)  # batchsize , ( somethign)
+            #Normalize vectors to unit norm 
             p_norm = torch.norm(P, p=2, dim=1).reshape((P.shape[0],1))
             P= P.div(p_norm.expand_as(P))
+            # calculate similarity matrix needed for loss calculation 
             dist_mat,truth_mat= generate_sim(P,imclass)
             # compute loss
             loss = my_loss(dist_mat.cpu(),truth_mat.cpu())
@@ -116,10 +124,7 @@ def list_train_loop(device,learn_rate,epochs,data,model,opti,checkpointName):
             learn_rate /= 1.5
             update_lr(opti,learn_rate)
         torch.save(MODEL.state_dict(), 'MRS_'+checkpointName+str(epoch)+'.ckpt')
-        try :
-            np.save('loss_file',BIG_L)
-        except :
-            pass
+        np.save('loss_file',BIG_L)
 
 if __name__=="__main__":
     (data_path,loss_name,embdDim,checkpointName,prevState) = parse_inputs() 

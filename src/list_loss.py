@@ -4,6 +4,25 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pdb 
 
+def generate_sim(x,y):  
+    """ Helper function used to calculate similarity and relevance matrices used by 
+    the average precision loss modules 
+    """
+    # 128 X 127 
+    simi_mat= torch.matmul(x,x.T)  #Cosine similarity calculaiton . i,j 
+    my_list = list()
+    num_samples = x.shape[0]
+    r = torch.arange(num_samples)
+    for i,e in enumerate(simi_mat):
+        my_list.append(e[r != i]) 
+    simi_mat  = torch.stack(my_list)
+    my_list = list()
+    for i,e in enumerate(y):
+        temp = e ==y
+        my_list.append(temp[ r != i])
+    rel_mat = torch.stack(my_list)
+    return simi_mat,rel_mat
+
 class APLoss (nn.Module):
     """ Differentiable AP loss, through quantization. From the paper:
         Learning with Average Precision: Training Image Retrieval with a Listwise Loss
