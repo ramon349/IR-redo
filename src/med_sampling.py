@@ -60,10 +60,10 @@ class med_samp(Dataset):
             return[p1,p2,p3]
 
     def __len__(self):
-        return 653
+        return len(self.big_dict)
 
     def __getitem__(self, idx):
-        paths = self._sample(idx)
+        paths = self.sample(idx)
         images = []
         for i in paths :
             temp = self.loader(i)
@@ -72,14 +72,14 @@ class med_samp(Dataset):
             images.append(temp)
         return (images[0],images[1],images[2])
 class med_list(med_samp):
-    def _sample(self,idx):
+    def sample(self,idx):
         im, im_class = self.big_dict[idx]
         im2 = np.random.choice(self.image_dict[self.rev_dict[im_class]])
         p1 = os.path.join(self.root_dir,'train',self.rev_dict[im_class],im)
         p2 = os.path.join(self.root_dir,'train',self.rev_dict[im_class],im2)
         return [p1,p2],im_class
     def __getitem__(self, idx):
-        paths,im_class = self._sample(idx)
+        paths,im_class = self.sample(idx)
         images = []
         for i in paths :
             temp = self.loader(i)
@@ -93,7 +93,7 @@ class med_sing(med_samp):
         p1 = os.path.join(self.root_dir,'train',self.rev_dict[im_class],im)
         return [p1],im_class
     def __getitem__(self, idx):
-        paths,im_class = self._sample(idx)
+        paths,im_class = self.sample(idx)
         images = []
         for i in paths :
             temp = self.loader(i)
@@ -123,14 +123,26 @@ class med_test(Dataset):
         self.loader = loader
 
         self.images = os.listdir(os.path.join(self.root_dir,'images'))
-        annot_path = os.path.join(self.root_dir,'val_annotations.txt')
+        annot_path = os.path.join(self.root_dir,'val_annotations2.txt')
         self.image_class = np.array(pd.read_csv(annot_path, sep='\t')[['mage','class']]).astype('str')
         self.class_dic = {}
         for i in self.image_class :
             self.class_dic[i[0]]=i[1]
 
     def sample(self,idx):
-        return self.images[idx]
+        im = self.images[idx]
+        im_class = self.class_dic[im]
+        p1 = os.path.join(self.root_dir,'images',im)
+        return [p1],im_class
+    def __getitem__(self, idx):
+        paths,im_class = self.sample(idx)
+        images = []
+        for i in paths :
+            temp = self.loader(i)
+            if self.transform:
+                temp = self.transform(temp)
+            images.append(temp)
+        return (images[0],im_class)
 
     def __len__(self):
         return len(self.images)

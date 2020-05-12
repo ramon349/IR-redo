@@ -63,7 +63,7 @@ class Tiny(Dataset):
         return 200*500
 
     def __getitem__(self, idx):
-        paths = self._sample(idx)
+        paths = self.sample(idx)
         images = []
         for i in paths :
             temp = self.loader(i)
@@ -72,14 +72,14 @@ class Tiny(Dataset):
             images.append(temp)
         return (images[0],images[1],images[2])
 class list_tiny(Tiny):
-    def _sample(self,idx):
+    def sample(self,idx):
         im, im_class = self.big_dict[idx]
         im2 = np.random.choice(self.image_dict[self.rev_dict[im_class]])
         p1 = os.path.join(self.root_dir,'train',self.rev_dict[im_class],'images',im)
         p2 = os.path.join(self.root_dir,'train',self.rev_dict[im_class],'images',im2)
         return [p1,p2],im_class
     def __getitem__(self, idx):
-        paths,im_class = self._sample(idx)
+        paths,im_class = self.sample(idx)
         images = []
         for i in paths :
             temp = self.loader(i)
@@ -93,7 +93,7 @@ class sing_tiny(Tiny):
         p1 = os.path.join(self.root_dir,'train',self.rev_dict[im_class],'images',im)
         return [p1],im_class
     def __getitem__(self, idx):
-        paths,im_class = self._sample(idx)
+        paths,im_class = self.sample(idx)
         images = []
         for i in paths :
             temp = self.loader(i)
@@ -128,12 +128,22 @@ class tiny_test(Dataset):
         self.class_dic = {}
         for i in self.image_class :
             self.class_dic[i[0]]=i[1]
-
-    def sample(self,idx):
-        return self.images[idx]
-
     def __len__(self):
         return len(self.images)
+    def sample(self,idx):
+        im = self.images[idx]
+        im_class =  self.clasdic[im]
+        p1 = os.path.join(self.root_dir,'images',im)
+        return [p1],im_class
+    def __getitem__(self, idx):
+        paths,im_class = self.sample(idx)
+        images = []
+        for i in paths :
+            temp = self.loader(i)
+            if self.transform:
+                temp = self.transform(temp)
+            images.append(temp)
+        return (images[0],im_class)
 def tiny_factory(mode="train",sampling=None,data_path=None):
     if mode =="test": 
         return tiny_test(data_path)

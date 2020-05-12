@@ -16,12 +16,28 @@ def build_model(DEVICE,embd_size=124,MODEL_PATH=None):
         main point of variance in our project is embedding size and 
         loss fuction used. For consistency all models are built from the same funciton 
     """ 
+    if DEVICE.type =='cpu':
+        print("using cpu")
+        return build_cpu_model(DEVICE,embd_size=embd_size,MODEL_PATH=MODEL_PATH) 
     MODEL  = models.resnet101(pretrained=True)
     num_features = MODEL.fc.in_features
     MODEL.fc = nn.Linear(num_features,embd_size) 
     MODEL = MODEL.to(DEVICE)
     if MODEL_PATH: 
         MODEL.load_state_dict(torch.load(MODEL_PATH))
+    return MODEL
+
+def build_cpu_model(DEVICE,embd_size=124,MODEL_PATH=None):
+    """ Script to build the standard backboen of our project. 
+        main point of variance in our project is embedding size and 
+        loss fuction used. For consistency all models are built from the same funciton 
+    """ 
+    MODEL  = models.resnet101(pretrained=True)
+    num_features = MODEL.fc.in_features
+    MODEL.fc = nn.Linear(num_features,embd_size) 
+    MODEL = MODEL.to(DEVICE)
+    if MODEL_PATH: 
+        MODEL.load_state_dict(torch.load(MODEL_PATH,map_location=torch.device('cpu')))
     return MODEL
 
 def parse_inputs():
@@ -94,7 +110,7 @@ def list_train_loop(device,learn_rate,epochs,data,model,opti,checkpointName):
     LOSS_TR=[]
     for epoch in range(epochs):
         for i, (s1,s2,imclass) in enumerate(data): # see samplign code for s1,s2
-            print(i,end='\r')
+            print("done with batch {} epoch {}".format(i,epoch),end='\r')
             # stack samples vertically onto a single batch 
             P = torch.cat((s1,s2),0)
             P = P.to(device)
@@ -109,7 +125,6 @@ def list_train_loop(device,learn_rate,epochs,data,model,opti,checkpointName):
             dist_mat,truth_mat= generate_sim(P,imclass)
             # compute loss
             loss = my_loss(dist_mat.cpu(),truth_mat.cpu())
-            print(loss)
             # Backward and optimize
             loss.backward()
             LOSS_TR.append(loss.item())
@@ -123,10 +138,10 @@ def list_train_loop(device,learn_rate,epochs,data,model,opti,checkpointName):
         if (epoch+1) % 3 == 0:
             learn_rate /= 1.5
             update_lr(opti,learn_rate)
-        check_file_name = './embeddings/MRS_'+checkpointName+str(epoch)+'.ckpt'
+        check_file_name = './checkpoints/MRS_'+checkpointName+"_"+str(epoch)+'.ckpt'
         torch.save(MODEL.state_dict(), check_file_name)
-        loss_file_name='./losses/'+checkpointName+str(epoch)+".npy" 
-        np.save(loss_file_name,BIG_L)
+    loss_file_name='./losses/'+checkpointName+".npy" 
+    np.save(loss_file_name,BIG_L)
 
 if __name__=="__main__":
     (data_path,loss_name,embdDim,checkpointName,prevState) = parse_inputs() 
@@ -147,10 +162,10 @@ if __name__=="__main__":
         print("working on path image data")
         TINY = med_factory(mode="train",sampling=loss_name,data_path=data_path)
     if TINY:
-        DATALOADER = DataLoader(TINY, batch_size=16,shuffle=True)
+        DATALOADER = DataLoader(TINY, batch_size=16,shuffle=True,num_workers=16)
     else:
         raise ValueError("DATASET NAMES ARE INCORRECT" + dataset)
-    NUM_EPOCHS = 20
+    NUM_EPOCHS = 100
     LEARNING_RATE = 0.0001 
     MODEL = build_model(DEVICE,embd_size=embdDim,MODEL_PATH=prevState) 
     OPTIMIZER = torch.optim.Adam(MODEL.parameters(), lr = 0.0001)

@@ -1,7 +1,7 @@
 #!/bin/sh
-#SBATCH -J tripletLoss
+#SBATCH -J list_128
 #SBATCH -p gpu 
-#SBATCH -o triplet_loss_log.txt 
+#SBATCH -o list_loss_128_log.txt 
 #SBATCH -G 1 
 #SBATCH --mem 16G 
 #SBATCH -t 48:0:0 
